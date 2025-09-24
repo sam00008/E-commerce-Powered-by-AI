@@ -5,6 +5,7 @@ import { forgotPasswordMailgenContent, sendEmail } from "../utils/mail.js";
 import validator from "validator";
 import User from "../model/userModel.js"; // ✅ Correct import
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 // Generate Access & Refresh Tokens
 const generateAccessAndRefreshToken = async (userId) => {
     try {
@@ -74,47 +75,35 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 const loginUser = asyncHandler(async (req, res) => {
-    const { email, password } = req.body;
-    if (!email) {
-        throw new ApiError(400, "Email is required");
-    }
+  const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+  const user = await User.findOne({ email });
+  if (!user) throw new ApiError(401, "Invalid credentials");
 
-    if (!user) {
-        throw new ApiError(400, "User does not exist");
-    }
-    const isPasswordCorrect = await user.isPasswordCorrect(password);
-    if (!isPasswordCorrect) {
-        throw new ApiError(400, "Password is incorrect");
-    }
+  const isMatch = await user.isPasswordCorrect(password);
+  if (!isMatch) throw new ApiError(401, "Invalid credentials");
 
-    const { AccessToken, RefreshToken } = await generateAccessAndRefreshToken(user._id);
-    const loggedInUser = await User.findOne(user._id).select(
-        "-password  -refreshToken -cartData"
-    );
+  // Sign JWT
+  const token = jwt.sign({ _id: user._id }, process.env.ACCESS_TOKEN_SECRET, {
+    expiresIn: "1d",
+  });
 
-    const options = {
-        httpOnly: true,
-        secure: true
-    }
+  // Set cookie
+  res.cookie("accessToken", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production", // true in prod, false in dev
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+    maxAge: 24 * 60 * 60 * 1000,
+  });
 
-    return res
-        .status(200)
-        .cookie("accessToken", AccessToken, options)
-        .cookie("refreshToken", RefreshToken, options)
-        .json(
-            new ApiResponse(
-                200,
-                {
-                    user: loggedInUser,
-                    accessToken: AccessToken,
-                    refreshToken: RefreshToken
-                },
-                "User logged in successfully"
-            )
-        )
+  // Return user data
+  res.status(200).json({
+    status: 200,
+    data: { user: { name: user.name, email: user.email, _id: user._id } },
+    message: "Login successful",
+  });
 });
+
 
 const logoutUser = asyncHandler(async (req, res) => {
     // 1. Clear the refresh token in database

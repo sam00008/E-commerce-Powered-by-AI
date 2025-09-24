@@ -8,5 +8,5 @@ router.route("/login").post(loginUser);
 router.route("/logout").post(verifyjwt,logoutUser );
 router.route("/forgot-password").post(forgetPassword);
 router.route("/reset-password/:resetToken").post(resetForgotPassword);
-router.route("/current-user").post(verifyjwt,getCurrentUser);
+router.route("/current-user").get(verifyjwt,getCurrentUser);
 export default router;
