@@ -42,7 +42,7 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 
     // 3. Validate password
-    if (password.length < 5) {
+    if (password.length < 6) {
         throw new ApiError(401, "Password must be at least 5 characters long");
     }
 
