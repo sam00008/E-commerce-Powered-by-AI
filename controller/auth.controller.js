@@ -75,33 +75,33 @@ const registerUser = asyncHandler(async (req, res) => {
 });
 
 const loginUser = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+    const { email, password } = req.body;
 
-  const user = await User.findOne({ email });
-  if (!user) throw new ApiError(401, "Invalid credentials");
+    const user = await User.findOne({ email });
+    if (!user) throw new ApiError(401, "Invalid credentials");
 
-  const isMatch = await user.isPasswordCorrect(password);
-  if (!isMatch) throw new ApiError(401, "Invalid credentials");
+    const isMatch = await user.isPasswordCorrect(password);
+    if (!isMatch) throw new ApiError(401, "Invalid credentials");
 
-  // Sign JWT
-  const token = jwt.sign({ _id: user._id }, process.env.ACCESS_TOKEN_SECRET, {
-    expiresIn: "1d",
-  });
+    // Sign JWT
+    const token = jwt.sign({ _id: user._id }, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1d",
+    });
 
-  // Set cookie
-  res.cookie("accessToken", token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production", // true in prod, false in dev
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-    maxAge: 24 * 60 * 60 * 1000,
-  });
+    // Set cookie
+    res.cookie("accessToken", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production", // true in prod, false in dev
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+        maxAge: 24 * 60 * 60 * 1000,
+    });
 
-  // Return user data
-  res.status(200).json({
-    status: 200,
-    data: { user: { name: user.name, email: user.email, _id: user._id } },
-    message: "Login successful",
-  });
+    // Return user data
+    res.status(200).json({
+        status: 200,
+        data: { user: { name: user.name, email: user.email, _id: user._id } },
+        message: "Login successful",
+    });
 });
 
 
@@ -200,14 +200,53 @@ const resetForgotPassword = asyncHandler(async (req, res) => {
 });
 const getCurrentUser = asyncHandler(async (req, res) => {
     return res
-      .status(200)
-      .json(
-        new ApiResponse(
-            200,
-            req.user,
-            "current User fetched successfully"
-        )
-      );
+        .status(200)
+        .json(
+            new ApiResponse(
+                200,
+                req.user,
+                "current User fetched successfully"
+            )
+        );
+});
+
+const adminLogin = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+
+  const adminEmail = process.env.ADMIN_LOGIN_EMAIL;
+  const adminPassword = process.env.ADMIN_LOGIN_PASSWORD;
+
+  // Always return JSON, no HTML
+  if (adminEmail !== email) {
+    return res.status(401).json({ message: "Invalid Email Id" });
+  }
+
+  if (adminPassword !== password) {
+    return res.status(401).json({ message: "Password not correct" });
+  }
+
+  // Sign JWT
+  const token = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, {
+    expiresIn: "7d",
+  });
+
+  // Set cookie
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production", // true only in production
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  };
+  res.cookie("AccessToken", token, cookieOptions);
+
+  // Return JSON
+  return res.status(200).json(
+    new ApiResponse(
+      200,
+      { adminEmail: email, accessToken: token },
+      "Admin Login Successfully"
+    )
+  );
 });
 
 export {
@@ -216,5 +255,6 @@ export {
     logoutUser,
     forgetPassword,
     resetForgotPassword,
-    getCurrentUser
+    getCurrentUser,
+    adminLogin
 };
